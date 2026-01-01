@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GD Collab</title>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0b0f1a;
+      color: #e5e7eb;
+      font-family: Arial, sans-serif;
+    }
+    h1, h2, h3 {
+      color: #60a5fa;
+    }
+    section {
+      border: 1px solid #1f2937;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+    input, textarea, button {
+      width: 100%;
+      margin-top: 6px;
+      margin-bottom: 10px;
+      padding: 8px;
+      background: #111827;
+      color: white;
+      border: 1px solid #374151;
+      border-radius: 4px;
+    }
+    button {
+      background: #2563eb;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .level {
+      border: 1px solid #374151;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 6px;
+    }
+    .small {
+      font-size: 0.9em;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🎮 GD Collab</h1>
+<p class="small">A collaboration hub for Geometry Dash creators</p>
+
+<section>
+  <h2>1️⃣ Account</h2>
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="signUp()">Sign Up</button>
+  <button onclick="signIn()">Sign In</button>
+  <p id="authStatus"></p>
+</section>
+
+<section>
+  <h2>2️⃣ Your Profile</h2>
+  <input id="username" placeholder="Username">
+  <input id="roles" placeholder="Roles (Layout, Deco, Effects)">
+  <textarea id="bio" placeholder="Short bio"></textarea>
+  <button onclick="saveProfile()">Save Profile</button>
+</section>
+
+<section>
+  <h2>3️⃣ Create a Level</h2>
+  <input id="levelName" placeholder="Level name">
+  <textarea id="levelDesc" placeholder="Description"></textarea>
+  <input id="levelProgress" placeholder="Progress (Layout only, 50% deco)">
+  <input id="levelRoles" placeholder="Roles needed (comma separated)">
+  <button onclick="createLevel()">Create Level</button>
+</section>
+
+<section>
+  <h2>4️⃣ Open Levels</h2>
+  <div id="levels"></div>
+</section>
+
+<script>
+  const supabase = window.supabase.createClient(
+    "PASTE_YOUR_SUPABASE_URL_HERE",
+    "PASTE_YOUR_SUPABASE_ANON_KEY_HERE"
+  );
+
+  let currentUser = null;
+
+  async function signUp() {
+    const { error } = await supabase.auth.signUp({
+      email: email.value,
+      password: password.value
+    });
+    authStatus.innerText = error ? error.message : "Signed up! Now sign in.";
+  }
+
+  async function signIn() {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.value,
+      password: password.value
+    });
+    if (error) {
+      authStatus.innerText = error.message;
+      return;
+    }
+    currentUser = data.user;
+    authStatus.innerText = "Logged in!";
+    loadLevels();
+  }
+
+  async function saveProfile() {
+    if (!currentUser) return alert("Sign in first");
+
+    await supabase.from("profiles").upsert({
+      id: currentUser.id,
+      username: username.value,
+      roles: roles.value.split(","),
+      bio: bio.value
+    });
+
+    alert("Profile saved");
+  }
+
+  async function createLevel() {
+    if (!currentUser) return alert("Sign in first");
+
+    await supabase.from("levels").insert({
+      creator_id: currentUser.id,
+      name: levelName.value,
+      description: levelDesc.value,
+      progress: levelProgress.value,
+      roles_needed: levelRoles.value.split(",")
+    });
+
+    loadLevels();
+  }
+
+  async function applyToLevel(levelId) {
+    const role = prompt("Which role are you applying for?");
+    const message = prompt("Short message:");
+
+    await supabase.from("applications").insert({
+      level_id: levelId,
+      user_id: currentUser.id,
+      role,
+      message
+    });
+
+    alert("Application sent");
+  }
+
+  async function loadLevels() {
+    const { data: levels } = await supabase.from("levels").select("*");
+    levelsDiv.innerHTML = "";
+
+    for (let level of levels) {
+      levelsDiv.innerHTML += `
+        <div class="level">
+          <h3>${level.name}</h3>
+          <p>${level.description}</p>
+          <p class="small">Progress: ${level.progress}</p>
+          <p class="small">Needs: ${level.roles_needed.join(", ")}</p>
+          <button onclick="applyToLevel('${level.id}')">Apply</button>
+        </div>
+      `;
+    }
+  }
+</script>
+
+</body>
+</html>
